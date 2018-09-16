@@ -1,0 +1,55 @@
+{
+    "manifestVersion": 1,
+    "id": "azure-git-ops",
+    "name": "GitOps",
+    "version": "1.0.0",
+    "publisher": "RomanNovitsky",
+	"public": false,
+    "targets": [
+        {
+            "id": "Microsoft.VisualStudio.Services"
+        }
+    ],    
+    "description": "Git build tasks",
+    "categories": [
+        "Build and release"
+    ],
+    "icons": {
+        "default": "extension-icon.png"        
+    },
+	"tags": [
+        "git",
+        "pull request"
+    ],
+    "files": [
+        {
+            "path": "task"
+        }
+    ],
+    "contributions": [
+        {
+            "id": "custom-build-task",
+            "type": "ms.vss-distributed-task.task",
+            "targets": [
+                "ms.vss-distributed-task.tasks"
+            ],
+            "properties": {
+                "name": "Task"
+            }
+        }
+    ],
+	"scopes": [
+        "vso.build",
+        "vso.build_execute"
+    ],
+	"links": {
+        "learn": {
+            "uri": "https://github.com/4ux-nbIx/azure-git-ops"
+        }
+    },
+	"content": {
+		"details": {
+			"path": "README.md"
+		}
+	}
+}

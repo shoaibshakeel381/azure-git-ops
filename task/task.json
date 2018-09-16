@@ -1,0 +1,59 @@
+﻿{
+    "id": "38436e26-5610-4462-a573-688a2bf8858f",
+    "name": "azure-git-ops",
+    "friendlyName": "GitOps",
+    "description": "Git build tasks",
+    "helpMarkDown": "[More Information](https://github.com/4ux-nbIx/azure-git-ops)",
+    "category": "Build",
+    "visibility": [
+        "Build"
+    ],
+    "author": "Roman Novitsky",
+    "version": {
+        "Major": 1,
+        "Minor": 0,
+        "Patch": 0
+    },
+    "demands": [
+    ],
+    "minimumAgentVersion": "1.83.0",
+        "groups": [
+        {
+            "name": "configurationOptions",
+            "displayName": "Configuration",
+            "isExpanded": true
+        },
+        {
+            "name": "advancedOptions",
+            "displayName": "Advanced Options",
+            "isExpanded": false
+        }
+    ],
+    "inputs": [
+        {
+            "name": "command",
+            "type": "pickList",
+            "label": "Command",
+            "defaultValue": "Commit",
+            "required": true,
+            "options": {
+                "Commit": "commit",
+                "Push": "push",
+                "git diff": "diff"
+            },
+            "properties": {
+                "EditableOptions": "True"
+            },
+            "groupName": "configurationOptions",
+            "helpMarkDown": "Select a Git command."
+        }
+    ],
+    "instanceNameFormat": "Git command",
+    "execution": {
+        "PowerShell": {
+            "target": "$(currentDirectory)\\task.ps1",
+            "argumentFormat": "-command $(command)",
+            "workingDirectory": "$(currentDirectory)"
+        }
+    }
+}
