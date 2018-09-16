@@ -35,8 +35,12 @@ function Get-RepositoryUri
     }
     
     $repositoryUri = New-Object -TypeName System.UriBuilder -ArgumentList ($uri)
-    $repositoryUri.UserName = 'OAuth'
-    $repositoryUri.Password = $Env:SYSTEM_ACCESSTOKEN
+    
+    if ($Env:SYSTEM_ACCESSTOKEN -ne $null)
+    {
+        $repositoryUri.UserName = 'OAuth'
+        $repositoryUri.Password = $Env:SYSTEM_ACCESSTOKEN
+    }
     
     return $repositoryUri
 }
@@ -295,16 +299,25 @@ function Invoke-GitCommit
         $message
     )
     
-    $quotes = '"'
-    $authorName = $authorName.Trim($quotes).Trim()
-    $authorEmail = $authorEmail.Trim($quotes).Trim()
-    $message = $message.Trim($quotes).Trim()
+    [string[]] $files = Get-ModifiedFiles
+    
+    if ($files.Count -gt 0)
+    {
+        $quotes = '"'
+        $authorName = $authorName.Trim($quotes).Trim()
+        $authorEmail = $authorEmail.Trim($quotes).Trim()
+        $message = $message.Trim($quotes).Trim()
 
-    Invoke-GitCommand -command "git config user.email ""$authorEmail"""
-    Invoke-GitCommand -command "git config user.name ""$authorName"""
-    Invoke-GitCommand -command "git commit -a -m ""$message"""
+        Invoke-GitCommand -command "git config user.email ""$authorEmail"""
+        Invoke-GitCommand -command "git config user.name ""$authorName"""
+        Invoke-GitCommand -command "git commit -a -m ""$message"""
 
-    Set-Results -summaryMessage 'Committed changes' -buildResult 'Succeeded'
+        Set-Results -summaryMessage "Git commit '$message': done!" -buildResult Succeeded
+    }
+    else
+    {
+        Set-Results -summaryMessage "Git commit '$message': skipped. No changes." -buildResult Skipped
+    }
 }
 
 function Invoke-GitCheckout
@@ -323,7 +336,7 @@ function Invoke-GitCheckout
     Invoke-GitCommand -command "git fetch --quiet $remoteUrl $sourceBranch"
     Invoke-GitCommand -command 'git checkout --quiet FETCH_HEAD'
 
-    Set-Results -summaryMessage "Checked out $sourceBranch" -buildResult Succeeded
+    Set-Results -summaryMessage "Git checkout $remoteUrl $($sourceBranch): done!" -buildResult Succeeded
 }
 
 function Invoke-GitPush 
@@ -336,12 +349,12 @@ function Invoke-GitPush
         Write-Host 'Pushing changes to source branch'
         Invoke-GitCommand -command "git push --quiet $remoteUrl HEAD:$sourceBranch"
 
-        $message = "Pushed changes to $remoteUrl $sourceBranch"
+        $message = "Git push to $remoteUrl $($sourceBranch): done!"
         Set-Results -summaryMessage $message -buildResult Cancelled
     }
     else 
     {
-        Set-Results -summaryMessage '' -buildResult Skipped
+        Set-Results -summaryMessage "Git push to $remoteUrl $($sourceBranch): skipped. No new commits." -buildResult Skipped
     }
 }
 
@@ -391,7 +404,7 @@ function Invoke-GitDiff
     $resultString = [string]::Join($separator, $result)
     Write-Host "##vso[task.setvariable variable=$outVarName]$resultString"
 
-    Set-Results -summaryMessage 'Finished getting git diff' -buildResult 'Succeeded'
+    Set-Results -summaryMessage 'Git diff: done!' -buildResult Succeeded
 }
 
 cdX -Path $env:BUILD_SOURCESDIRECTORY
