@@ -3,11 +3,10 @@ param
     [string] $command = '',
     [string] $commitAuthorEmail = 'gitops@dev.azure.com',
     [string] $commitAuthorName = 'GitOps',
-    [string] $commitMessage = 'N/A',
-    [string] $diffFilter = 'ARM',
+    [string] $commitMessage = 'GitOps',
+    [string] $diffFilter = 'ACDMRTUXB',
     [string] $diffFileFilter = '+*:*',
     [string] $diffVarName = 'GitDiffFiles',
-    [ValidateSet('build', 'pull request')]
     [string] $target = 'pull request'
 )
 
@@ -56,14 +55,16 @@ function Get-SourceBranchName
         $target
     )
     
+    $sourceBranch = $env:BUILD_SOURCEBRANCH.Replace('refs/', [string]::Empty)
+    
     if ($target -eq 'build') 
     {
-        return $env:BUILD_SOURCEBRANCH.Replace('refs/', [string]::Empty)
+        return $sourceBranch
     }
     else 
     { 
         # TODO: get source branch from Pull Request API response, because merge commit message format can change any time 
-        $branchName = git.exe log --format=%s -1
+        $branchName = git log --format=%s -1 $sourceBranch
         $separators = @(' from ', ' into ')
         $parts = $branchName.Split(@($separators), [StringSplitOptions]::RemoveEmptyEntries)
 
@@ -73,14 +74,28 @@ function Get-SourceBranchName
 
 function Get-ModifiedFiles 
 {
-    return @() + $(git.exe diff --exit-code --name-only)
+    return @() + $(git diff --exit-code --name-only)
 }
 
 function Test-CanPush
 {
-    $status = @() + $(git.exe status --porcelain --branch --no-ahead-behind)
+    param
+    (
+        [Parameter(Mandatory)]
+        [String]
+        $remoteUri,
+    
+        [Parameter(Mandatory)]
+        [String]
+        $branchName
+    )
+    
+    $remoteCommitId = $(git ls-remote $remoteUri $branchName)
+    $remoteCommitId = $remoteCommitId.Split(@("`t"), [StringSplitOptions]::RemoveEmptyEntries)[0]
+    
+    $currentCommitId = Get-CurrentGitCommitId
   
-    return $status[0].EndsWith('[different]')
+    return $currentCommitId -ne $remoteCommitId
 }
 
 
@@ -144,14 +159,13 @@ function Get-FilterTable
     )
     
     [char] $separator = ';'
-    [char] $quotes = '"'
     
     [hashtable] $filters = @{
         Include = @{}
         Exclude = @{}
     }
     
-    $filterString.Trim().Trim($quotes).Split(@($separator), [StringSplitOptions]::RemoveEmptyEntries) | 
+    $filterString.Split(@($separator), [StringSplitOptions]::RemoveEmptyEntries) | 
         ForEach-Object -Process {
             $filterParts = $_.Split(@(':'), [StringSplitOptions]::RemoveEmptyEntries)
                 
@@ -227,6 +241,24 @@ function Test-FilterMatch
 
 # Utilities
 
+function Get-TrimmedValue
+{
+    param
+    (
+        [String]
+        [Parameter(Mandatory)]
+        $parameter
+    )
+    
+    if ($parameter -eq $null)
+    {
+        return $null
+    }
+    
+    return $parameter.Trim().Trim('"').Trim()  
+}
+
+
 function Set-Results 
 {
     param(
@@ -235,7 +267,7 @@ function Set-Results
         $summaryMessage,
         
         [Parameter(Mandatory)]
-        [ValidateSet('Succeeded', 'Failed', 'Cancelled', 'Skipped')]
+        [ValidateSet('Succeeded', 'Failed', 'Canceled', 'Skipped')]
         [string]
         $buildResult
     )
@@ -251,6 +283,11 @@ function Set-Results
     }
     
     Import-Module -Name $taskCommonTools
+
+    if ($buildResult -eq 'Canceled')
+    {
+        Write-Host "##vso[task.setvariable variable=agent.jobstatus;]canceled"
+    }
 
     Write-Host ('##vso[task.complete result={0};]{1}' -f $buildResult, $summaryMessage)
 }
@@ -303,11 +340,6 @@ function Invoke-GitCommit
     
     if ($files.Count -gt 0)
     {
-        $quotes = '"'
-        $authorName = $authorName.Trim($quotes).Trim()
-        $authorEmail = $authorEmail.Trim($quotes).Trim()
-        $message = $message.Trim($quotes).Trim()
-
         Invoke-GitCommand -command "git config user.email ""$authorEmail"""
         Invoke-GitCommand -command "git config user.name ""$authorName"""
         Invoke-GitCommand -command "git commit -a -m ""$message"""
@@ -316,7 +348,7 @@ function Invoke-GitCommit
     }
     else
     {
-        Set-Results -summaryMessage "Git commit '$message': skipped. No changes." -buildResult Skipped
+        Set-Results -summaryMessage "Git commit '$message': skipped. No changes." -buildResult Succeeded
     }
 }
 
@@ -328,33 +360,32 @@ function Invoke-GitCheckout
         [Parameter(Mandatory)]
         $target
     )
-    
 
     $sourceBranch = Get-SourceBranchName -target $target
     $remoteUrl = Get-RepositoryUri -target $target
 
     Invoke-GitCommand -command "git fetch --quiet $remoteUrl $sourceBranch"
     Invoke-GitCommand -command 'git checkout --quiet FETCH_HEAD'
-
+    
     Set-Results -summaryMessage "Git checkout $remoteUrl $($sourceBranch): done!" -buildResult Succeeded
 }
 
 function Invoke-GitPush 
 {
-    if (Test-CanPush) 
+    $sourceBranch = Get-SourceBranchName -target 'pull request'
+    $remoteUrl = Get-RepositoryUri -target 'pull request'
+        
+    if (Test-CanPush -remoteUri $remoteUrl -branchName $sourceBranch) 
     {
-        $sourceBranch = Get-SourceBranchName -target 'pull request'
-        $remoteUrl = Get-RepositoryUri -target 'pull request'
-
-        Write-Host 'Pushing changes to source branch'
+        Write-Host "Pushing changes to $remoteUrl $sourceBranch"
         Invoke-GitCommand -command "git push --quiet $remoteUrl HEAD:$sourceBranch"
 
         $message = "Git push to $remoteUrl $($sourceBranch): done!"
-        Set-Results -summaryMessage $message -buildResult Cancelled
+        Set-Results -summaryMessage $message -buildResult Canceled
     }
     else 
     {
-        Set-Results -summaryMessage "Git push to $remoteUrl $($sourceBranch): skipped. No new commits." -buildResult Skipped
+        Set-Results -summaryMessage "Git push to $remoteUrl $($sourceBranch): skipped. No new commits." -buildResult Succeeded
     }
 }
 
@@ -376,7 +407,6 @@ function Invoke-GitDiff
     )
     
     $separator = ';'
-    $quotes = '"'
     
     [hashtable] $gitDiff = Get-PullRequestChanges -diffFilter $diffFilter
     [hashtable] $filter = Get-FilterTable -filterString $fileFilter
@@ -398,7 +428,7 @@ function Invoke-GitDiff
             $result = $result + $filteredFiles
         }
         
-    Write-Host "Filtered git diff:"
+    Write-Host 'Filtered git diff:'
     Write-Host $($result| Sort-Object) -Separator "`n"
 
     $resultString = [string]::Join($separator, $result)
@@ -407,7 +437,15 @@ function Invoke-GitDiff
     Set-Results -summaryMessage 'Git diff: done!' -buildResult Succeeded
 }
 
-cdX -Path $env:BUILD_SOURCESDIRECTORY
+cd -Path $env:BUILD_SOURCESDIRECTORY
+
+$target = Get-TrimmedValue -parameter $target
+$commitAuthorName = Get-TrimmedValue -parameter $commitAuthorName
+$commitAuthorEmail = Get-TrimmedValue -parameter $commitAuthorEmail
+$commitMessage = Get-TrimmedValue -parameter $commitMessage
+$diffFilter = Get-TrimmedValue -parameter $diffFilter
+$diffFileFilter = Get-TrimmedValue -parameter $diffFileFilter
+$diffVarName = Get-TrimmedValue -parameter $diffVarName
 
 if ($command -eq 'checkout') 
 {

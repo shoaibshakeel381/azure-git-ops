@@ -2,7 +2,7 @@
     "id": "38436e26-5610-4462-a573-688a2bf8858f",
     "name": "azure-git-ops",
     "friendlyName": "GitOps",
-    "description": "Git build tasks",
+    "description": "Git build tasks: execute git diff, checkout, commit, push on build or pull request branches.",
     "helpMarkDown": "[More Information](https://github.com/4ux-nbIx/azure-git-ops)",
     "category": "Build",
     "visibility": [
@@ -12,7 +12,7 @@
     "version": {
         "Major": 1,
         "Minor": 0,
-        "Patch": 0
+        "Patch": 11
     },
     "demands": [
     ],
@@ -34,25 +34,103 @@
             "name": "command",
             "type": "pickList",
             "label": "Command",
-            "defaultValue": "Commit",
+            "defaultValue": "commit",
             "required": true,
             "options": {
-                "Commit": "commit",
-                "Push": "push",
-                "git diff": "diff"
+                "commit": "commit",
+                "push": "push",
+                "diff": "diff",
+                "checkout": "checkout"
             },
             "properties": {
                 "EditableOptions": "True"
             },
             "groupName": "configurationOptions",
             "helpMarkDown": "Select a Git command."
+        },
+        {
+            "name": "commitAuthorEmail",
+            "type": "string",
+            "label": "Commit autor email",
+            "defaultValue": "gitops@azure.dev.com",
+            "required": true,
+            "helpMarkDown": "Commit author email.",
+            "groupName": "configurationOptions",
+            "visibleRule": "command = commit"
+        }, 
+        {
+            "name": "commitAuthorName",
+            "type": "string",
+            "label": "Commit autor name",
+            "defaultValue": "GitOps",
+            "required": true,
+            "helpMarkDown": "Commit author name.",
+            "groupName": "configurationOptions",
+            "visibleRule": "command = commit"
+        }, 
+        {
+            "name": "commitMessage",
+            "type": "string",
+            "label": "Commit message",
+            "defaultValue": "GitOps",
+            "required": true,
+            "helpMarkDown": "Commit message.",
+            "groupName": "configurationOptions",
+            "visibleRule": "command = commit"
+        }, 
+        {
+            "name": "diffFilter",
+            "type": "string",
+            "label": "--diff-filter",
+            "defaultValue": "ACDMRTUXB",
+            "required": true,
+            "helpMarkDown": "Select only files that are Added (A), Copied (C), Deleted (D), Modified (M), Renamed (R), have their type (i.e. regular file, symlink, submodule, …​) changed (T), are Unmerged (U), are Unknown (X), or have had their pairing Broken (B). Any combination of the filter characters (including none) can be used.",
+            "groupName": "configurationOptions",
+            "visibleRule": "command = diff"
+        }, 
+        {
+            "name": "diffFileFilter",
+            "type": "string",
+            "label": "File filter",
+            "defaultValue": "+*:*",
+            "required": true,
+            "helpMarkDown": "Get only files matching provided path patterns. Wildcards are permitted. Format: (-|+)[(A|C|D|M|R|T|U|X|B|*):path;. Example: '+*:*; -M:Dir/*' include all and exclude modified files in Dir/",
+            "groupName": "configurationOptions",
+            "visibleRule": "command = diff"
+        }, 
+        {
+            "name": "diffVarName",
+            "type": "string",
+            "label": "Output variable name",
+            "defaultValue": "gitDiff",
+            "required": true,
+            "helpMarkDown": "The name of the output variable to store git diff results in later build steps.",
+            "groupName": "configurationOptions",
+            "visibleRule": "command = diff"
+        }, 
+        {
+            "name": "checkoutBranch",
+            "type": "pickList",
+            "label": "Checkout branch",
+            "defaultValue": "pull request",
+            "required": true,
+            "options": {
+                "build": "build",
+                "pull request": "pull request"
+            },
+            "properties": {
+                "EditableOptions": "True"
+            },
+            "helpMarkDown": "Branch to checout: the build branch or pull request branch.",
+            "groupName": "configurationOptions",
+            "visibleRule": "command = checkout"
         }
     ],
     "instanceNameFormat": "Git command",
     "execution": {
         "PowerShell": {
             "target": "$(currentDirectory)\\task.ps1",
-            "argumentFormat": "-command $(command)",
+            "argumentFormat": "-command $(command) -commitAuthorEmail \"$(commitAuthorEmail)\" -commitAuthorName \"$(commitAuthorName)\" -commitMessage \"$(commitMessage)\" -diffFilter \"$(diffFilter)\" -diffFileFilter \"$(diffFileFilter)\" -diffVarName \"$(diffVarName)\" -target \"$(checkoutBranch)\"",
             "workingDirectory": "$(currentDirectory)"
         }
     }

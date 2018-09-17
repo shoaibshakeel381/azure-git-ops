@@ -2,7 +2,7 @@
     "manifestVersion": 1,
     "id": "azure-git-ops",
     "name": "GitOps",
-    "version": "1.0.0",
+    "version": "1.0.11",
     "publisher": "RomanNovitsky",
 	"public": false,
     "targets": [
@@ -10,7 +10,7 @@
             "id": "Microsoft.VisualStudio.Services"
         }
     ],    
-    "description": "Git build tasks",
+    "description": "Git build tasks: execute git diff, checkout, commit, push on build or pull request branches.",
     "categories": [
         "Build and release"
     ],
