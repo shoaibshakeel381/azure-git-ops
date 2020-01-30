@@ -128,7 +128,7 @@
     ],
     "instanceNameFormat": "Git command",
     "execution": {
-        "PowerShell": {
+        "PowerShell3": {
             "target": "$(currentDirectory)\\task.ps1",
             "argumentFormat": "-command $(command) -commitAuthorEmail \"$(commitAuthorEmail)\" -commitAuthorName \"$(commitAuthorName)\" -commitMessage \"$(commitMessage)\" -diffFilter \"$(diffFilter)\" -diffFileFilter \"$(diffFileFilter)\" -diffVarName \"$(diffVarName)\" -target \"$(checkoutBranch)\"",
             "workingDirectory": "$(currentDirectory)"
